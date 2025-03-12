@@ -20,6 +20,7 @@
     "@types/react-dom": "latest",
     "autoprefixer": "latest",
     "postcss": "latest",
+    "postcss-import": "^16.1.0",
     "prisma": "^5.10.2",
     "tailwindcss": "latest",
     "typescript": "5.8.2"
