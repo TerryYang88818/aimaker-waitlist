@@ -1,0 +1,346 @@
+From ce9df386e8411520572e185c6f4284eeeffbcfa2 Mon Sep 17 00:00:00 2001
+From: Terry Yang <ytm88818@163.com>
+Date: Wed, 12 Mar 2025 14:48:52 +0800
+Subject: [PATCH] =?UTF-8?q?=E5=AE=9E=E7=8E=B0=E5=9F=BA=E4=BA=8E=E6=96=87?=
+ =?UTF-8?q?=E4=BB=B6=E5=AD=98=E5=82=A8=E7=9A=84=E7=AE=80=E5=8D=95waitlist?=
+ =?UTF-8?q?=E5=8A=9F=E8=83=BD?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ data/waitlist.json        |   1 +
+ pages/api/get-waitlist.ts |  63 +++++++++++++++++++++
+ pages/api/simple-join.ts  | 115 ++++++++++++++++++++++++++++++++++++++
+ pages/index.tsx           |   3 +-
+ pages/view-waitlist.tsx   |  78 ++++++++++++++++++++++++++
+ vercel.json               |  10 +++-
+ 6 files changed, 267 insertions(+), 3 deletions(-)
+ create mode 100644 data/waitlist.json
+ create mode 100644 pages/api/get-waitlist.ts
+ create mode 100644 pages/api/simple-join.ts
+ create mode 100644 pages/view-waitlist.tsx
+
+diff --git a/data/waitlist.json b/data/waitlist.json
+new file mode 100644
+index 0000000..130e4e4
+--- /dev/null
++++ b/data/waitlist.json
+@@ -0,0 +1 @@
++[] 
+\ No newline at end of file
+diff --git a/pages/api/get-waitlist.ts b/pages/api/get-waitlist.ts
+new file mode 100644
+index 0000000..a0434da
+--- /dev/null
++++ b/pages/api/get-waitlist.ts
+@@ -0,0 +1,63 @@
++import { NextApiRequest, NextApiResponse } from 'next';
++import fs from 'fs';
++import path from 'path';
++
++// 一个简单的文件存储机制，不依赖数据库
++const DATA_FILE = path.join(process.cwd(), 'data', 'waitlist.json');
++
++// 读取waitlist数据
++const readWaitlistData = (): string[] => {
++  try {
++    if (!fs.existsSync(DATA_FILE)) {
++      return [];
++    }
++    const data = fs.readFileSync(DATA_FILE, 'utf8');
++    return JSON.parse(data);
++  } catch (error) {
++    console.error('Error reading waitlist data:', error);
++    return [];
++  }
++};
++
++export default async function handler(
++  req: NextApiRequest,
++  res: NextApiResponse
++) {
++  // 设置CORS头
++  res.setHeader('Access-Control-Allow-Origin', '*');
++  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
++  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
++
++  // 处理预检请求
++  if (req.method === 'OPTIONS') {
++    return res.status(200).end();
++  }
++  
++  if (req.method !== 'GET') {
++    return res.status(405).json({ 
++      success: false,
++      message: 'Method not allowed' 
++    });
++  }
++
++  try {
++    console.log('Getting waitlist data');
++    
++    // 读取数据
++    const waitlist = readWaitlistData();
++    
++    return res.status(200).json({ 
++      success: true,
++      data: waitlist,
++      count: waitlist.length
++    });
++  } catch (error: any) {
++    console.error('Error in get-waitlist:', error);
++    
++    return res.status(500).json({ 
++      success: false,
++      message: 'Something went wrong',
++      error: error.message,
++    });
++  }
++} 
+\ No newline at end of file
+diff --git a/pages/api/simple-join.ts b/pages/api/simple-join.ts
+new file mode 100644
+index 0000000..086b85c
+--- /dev/null
++++ b/pages/api/simple-join.ts
+@@ -0,0 +1,115 @@
++import { NextApiRequest, NextApiResponse } from 'next';
++import fs from 'fs';
++import path from 'path';
++
++// 一个简单的文件存储机制，不依赖数据库
++const DATA_FILE = path.join(process.cwd(), 'data', 'waitlist.json');
++
++// 确保目录存在
++const ensureDirectoryExists = (filePath: string) => {
++  const dirname = path.dirname(filePath);
++  if (!fs.existsSync(dirname)) {
++    fs.mkdirSync(dirname, { recursive: true });
++  }
++};
++
++// 读取waitlist数据
++const readWaitlistData = (): string[] => {
++  try {
++    if (!fs.existsSync(DATA_FILE)) {
++      return [];
++    }
++    const data = fs.readFileSync(DATA_FILE, 'utf8');
++    return JSON.parse(data);
++  } catch (error) {
++    console.error('Error reading waitlist data:', error);
++    return [];
++  }
++};
++
++// 保存waitlist数据
++const saveWaitlistData = (emails: string[]) => {
++  try {
++    ensureDirectoryExists(DATA_FILE);
++    fs.writeFileSync(DATA_FILE, JSON.stringify(emails, null, 2));
++    return true;
++  } catch (error) {
++    console.error('Error saving waitlist data:', error);
++    return false;
++  }
++};
++
++export default async function handler(
++  req: NextApiRequest,
++  res: NextApiResponse
++) {
++  // 设置CORS头
++  res.setHeader('Access-Control-Allow-Origin', '*');
++  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
++  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
++
++  // 处理预检请求
++  if (req.method === 'OPTIONS') {
++    return res.status(200).end();
++  }
++  
++  console.log('Simple join API called');
++  console.log('Request method:', req.method);
++  console.log('Request body:', req.body);
++  
++  if (req.method !== 'POST') {
++    return res.status(405).json({ 
++      success: false,
++      message: 'Method not allowed' 
++    });
++  }
++
++  try {
++    const { email } = req.body;
++    
++    if (!email || !email.includes('@')) {
++      return res.status(400).json({ 
++        success: false,
++        message: 'Valid email is required' 
++      });
++    }
++
++    console.log('Joining waitlist with email:', email);
++    
++    // 读取现有数据
++    const waitlist = readWaitlistData();
++    
++    // 检查邮箱是否已存在
++    if (waitlist.includes(email)) {
++      return res.status(409).json({ 
++        success: false,
++        message: 'Email already registered' 
++      });
++    }
++    
++    // 添加新邮箱
++    waitlist.push(email);
++    
++    // 保存数据
++    const saved = saveWaitlistData(waitlist);
++    
++    if (saved) {
++      console.log('Successfully added email to waitlist:', email);
++      return res.status(200).json({ 
++        success: true,
++        message: 'Successfully joined waitlist',
++      });
++    } else {
++      throw new Error('Failed to save waitlist data');
++    }
++  } catch (error: any) {
++    console.error('Error in simple-join:', error);
++    console.error('Error stack:', error.stack);
++    
++    return res.status(500).json({ 
++      success: false,
++      message: 'Something went wrong',
++      error: error.message,
++    });
++  }
++} 
+\ No newline at end of file
+diff --git a/pages/index.tsx b/pages/index.tsx
+index 2500d1c..11aab09 100644
+--- a/pages/index.tsx
++++ b/pages/index.tsx
+@@ -18,7 +18,8 @@ export default function Home() {
+     console.log('Submitting form with email:', email);
+ 
+     try {
+-      const response = await fetch('/api/join-waitlist', {
++      // 使用简化版API端点
++      const response = await fetch('/api/simple-join', {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+diff --git a/pages/view-waitlist.tsx b/pages/view-waitlist.tsx
+new file mode 100644
+index 0000000..636b0dd
+--- /dev/null
++++ b/pages/view-waitlist.tsx
+@@ -0,0 +1,78 @@
++import React, { useState, useEffect } from 'react';
++import Head from 'next/head';
++import fs from 'fs';
++import path from 'path';
++
++// 服务器端获取数据
++export async function getServerSideProps() {
++  try {
++    const dataFile = path.join(process.cwd(), 'data', 'waitlist.json');
++    
++    if (!fs.existsSync(dataFile)) {
++      return { props: { emails: [] } };
++    }
++    
++    const data = fs.readFileSync(dataFile, 'utf8');
++    const emails = JSON.parse(data);
++    
++    return {
++      props: {
++        emails
++      }
++    };
++  } catch (error) {
++    console.error('Error reading waitlist data:', error);
++    return {
++      props: {
++        emails: [],
++        error: 'Failed to load waitlist data'
++      }
++    };
++  }
++}
++
++interface ViewWaitlistProps {
++  emails: string[];
++  error?: string;
++}
++
++export default function ViewWaitlist({ emails, error }: ViewWaitlistProps) {
++  return (
++    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
++      <Head>
++        <title>AImaker Waitlist - Admin View</title>
++        <meta name="description" content="View AImaker waitlist" />
++        <link rel="icon" href="/favicon.ico" />
++      </Head>
++
++      <main className="flex flex-col items-center w-full max-w-4xl mx-auto">
++        <h1 className="text-4xl font-bold mb-6">AImaker Waitlist</h1>
++        <p className="text-xl mb-8">Current waitlist members</p>
++        
++        {error && (
++          <div className="bg-red-50 text-red-500 p-4 rounded mb-6 w-full">
++            {error}
++          </div>
++        )}
++        
++        <div className="bg-white shadow-md rounded p-6 w-full">
++          <h2 className="text-xl font-semibold mb-4">Total: {emails.length} emails</h2>
++          
++          <div className="overflow-auto max-h-96">
++            {emails.length === 0 ? (
++              <p className="text-gray-500">No emails in the waitlist yet.</p>
++            ) : (
++              <ul className="space-y-2">
++                {emails.map((email, index) => (
++                  <li key={index} className="p-2 bg-gray-50 rounded">
++                    {email}
++                  </li>
++                ))}
++              </ul>
++            )}
++          </div>
++        </div>
++      </main>
++    </div>
++  );
++} 
+\ No newline at end of file
+diff --git a/vercel.json b/vercel.json
+index fa7a888..8902de1 100644
+--- a/vercel.json
++++ b/vercel.json
+@@ -9,7 +9,13 @@
+   "routes": [
+     {
+       "src": "/(.*)",
+-      "dest": "/"
++      "dest": "/$1"
+     }
+-  ]
++  ],
++  "functions": {
++    "api/*.js": {
++      "memory": 1024,
++      "maxDuration": 10
++    }
++  }
+ } 
+\ No newline at end of file
+-- 
+2.48.1.windows.1
+

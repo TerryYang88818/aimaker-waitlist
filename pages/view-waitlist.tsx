@@ -1,46 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
-import fs from 'fs';
-import path from 'path';
+import Link from 'next/link';
 
-// 服务器端获取数据
-export async function getServerSideProps() {
-  try {
-    const dataFile = path.join(process.cwd(), 'data', 'waitlist.json');
-    
-    if (!fs.existsSync(dataFile)) {
-      return { props: { emails: [] } };
+export default function ViewWaitlist() {
+  const [emails, setEmails] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  // 从localStorage加载数据
+  useEffect(() => {
+    try {
+      const savedWaitlist = localStorage.getItem('aimaker-waitlist');
+      if (savedWaitlist) {
+        setEmails(JSON.parse(savedWaitlist));
+      }
+    } catch (error) {
+      console.error('Failed to load waitlist from localStorage:', error);
+      setError('Failed to load waitlist data');
     }
-    
-    const data = fs.readFileSync(dataFile, 'utf8');
-    const emails = JSON.parse(data);
-    
-    return {
-      props: {
-        emails
-      }
-    };
-  } catch (error) {
-    console.error('Error reading waitlist data:', error);
-    return {
-      props: {
-        emails: [],
-        error: 'Failed to load waitlist data'
-      }
-    };
-  }
-}
+  }, []);
 
-interface ViewWaitlistProps {
-  emails: string[];
-  error?: string;
-}
-
-export default function ViewWaitlist({ emails, error }: ViewWaitlistProps) {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
       <Head>
-        <title>AImaker Waitlist - Admin View</title>
+        <title>AImaker Waitlist - View</title>
         <meta name="description" content="View AImaker waitlist" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
@@ -70,6 +52,12 @@ export default function ViewWaitlist({ emails, error }: ViewWaitlistProps) {
                 ))}
               </ul>
             )}
+          </div>
+
+          <div className="mt-6">
+            <Link href="/" className="text-blue-500 hover:text-blue-700">
+              &larr; Back to Home
+            </Link>
           </div>
         </div>
       </main>

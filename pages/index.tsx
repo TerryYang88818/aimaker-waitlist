@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 
 export default function Home() {
@@ -6,6 +6,30 @@ export default function Home() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
+  const [waitlist, setWaitlist] = useState<string[]>([]);
+
+  // 从localStorage加载数据
+  useEffect(() => {
+    try {
+      const savedWaitlist = localStorage.getItem('aimaker-waitlist');
+      if (savedWaitlist) {
+        setWaitlist(JSON.parse(savedWaitlist));
+      }
+    } catch (error) {
+      console.error('Failed to load waitlist from localStorage:', error);
+    }
+  }, []);
+
+  // 保存数据到localStorage
+  const saveToLocalStorage = (emails: string[]) => {
+    try {
+      localStorage.setItem('aimaker-waitlist', JSON.stringify(emails));
+      return true;
+    } catch (error) {
+      console.error('Failed to save waitlist to localStorage:', error);
+      return false;
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,42 +42,34 @@ export default function Home() {
     console.log('Submitting form with email:', email);
 
     try {
-      // 使用简化版API端点
-      const response = await fetch('/api/simple-join', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      console.log('Response status:', response.status);
-      
-      // 即使是错误状态码，也尝试解析JSON
-      let data;
-      try {
-        data = await response.json();
-        console.log('Response data:', data);
-      } catch (parseError) {
-        console.error('Failed to parse response:', parseError);
-        data = { message: 'Failed to parse server response' };
+      // 验证邮箱
+      if (!email || !email.includes('@')) {
+        throw new Error('Valid email is required');
       }
+
+      // 检查是否已存在
+      if (waitlist.includes(email)) {
+        setStatus('error');
+        setMessage('Email already registered');
+        return;
+      }
+
+      // 添加到waitlist
+      const newWaitlist = [...waitlist, email];
+      const saved = saveToLocalStorage(newWaitlist);
       
-      if (response.ok) {
+      if (saved) {
+        setWaitlist(newWaitlist);
         setStatus('success');
-        setMessage(data.message || 'Thanks for joining our waitlist!');
+        setMessage('Thanks for joining our waitlist!');
         setEmail('');
       } else {
-        setStatus('error');
-        setMessage(data.message || 'Something went wrong');
-        if (data.error) {
-          setErrorDetails(data.error);
-        }
+        throw new Error('Failed to save email');
       }
     } catch (error) {
-      console.error('Fetch error:', error);
+      console.error('Error:', error);
       setStatus('error');
-      setMessage('Failed to join waitlist. Please try again.');
+      setMessage(error instanceof Error ? error.message : 'Failed to join waitlist');
       if (error instanceof Error) {
         setErrorDetails(error.message);
       }
@@ -114,6 +130,14 @@ export default function Home() {
             )}
           </form>
         </div>
+
+        {/* 添加一个查看按钮，显示当前的waitlist */}
+        <button
+          onClick={() => window.location.href = '/view-waitlist'}
+          className="mt-4 text-blue-500 hover:text-blue-700"
+        >
+          View Waitlist
+        </button>
       </main>
     </div>
   );
