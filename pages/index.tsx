@@ -5,10 +5,17 @@ export default function Home() {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // 重置状态
     setStatus('loading');
+    setMessage('');
+    setErrorDetails(null);
+    
+    console.log('Submitting form with email:', email);
 
     try {
       const response = await fetch('/api/join-waitlist', {
@@ -19,19 +26,36 @@ export default function Home() {
         body: JSON.stringify({ email }),
       });
 
-      const data = await response.json();
+      console.log('Response status:', response.status);
+      
+      // 即使是错误状态码，也尝试解析JSON
+      let data;
+      try {
+        data = await response.json();
+        console.log('Response data:', data);
+      } catch (parseError) {
+        console.error('Failed to parse response:', parseError);
+        data = { message: 'Failed to parse server response' };
+      }
       
       if (response.ok) {
         setStatus('success');
-        setMessage('Thanks for joining our waitlist!');
+        setMessage(data.message || 'Thanks for joining our waitlist!');
         setEmail('');
       } else {
         setStatus('error');
         setMessage(data.message || 'Something went wrong');
+        if (data.error) {
+          setErrorDetails(data.error);
+        }
       }
     } catch (error) {
+      console.error('Fetch error:', error);
       setStatus('error');
       setMessage('Failed to join waitlist. Please try again.');
+      if (error instanceof Error) {
+        setErrorDetails(error.message);
+      }
     }
   };
 
@@ -75,7 +99,17 @@ export default function Home() {
             )}
             
             {status === 'error' && (
-              <p className="text-red-500 text-sm mt-4">{message}</p>
+              <div className="text-red-500 text-sm mt-4">
+                <p>{message}</p>
+                {errorDetails && (
+                  <details className="mt-2">
+                    <summary>Error details</summary>
+                    <pre className="text-xs text-left mt-1 p-2 bg-red-50 rounded overflow-auto">
+                      {errorDetails}
+                    </pre>
+                  </details>
+                )}
+              </div>
             )}
           </form>
         </div>
