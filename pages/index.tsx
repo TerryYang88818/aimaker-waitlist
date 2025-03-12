@@ -18,7 +18,8 @@ export default function Home() {
     console.log('Submitting form with email:', email);
 
     try {
-      const response = await fetch('/api/join-waitlist', {
+      // 使用简化版API端点
+      const response = await fetch('/api/simple-join', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
